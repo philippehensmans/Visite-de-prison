@@ -170,6 +170,14 @@
     .archive-toggle-btn { border: 1px solid var(--border); background: var(--card); color: var(--muted); border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 500; font-family: system-ui, -apple-system, sans-serif; cursor: pointer; transition: all 0.15s; }
     .archive-toggle-btn:active { transform: scale(0.96); }
     .archive-toggle-btn.active { background: #7A7560; color: #fff; border-color: #7A7560; }
+    .visited-filter-bar { display: flex; gap: 6px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+    .visited-filter-label { font-size: 12px; color: var(--muted); font-family: system-ui, -apple-system, sans-serif; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; margin-right: 2px; }
+    .visited-chip { border: 1px solid var(--border); background: var(--card); color: var(--muted); border-radius: 20px; padding: 6px 12px; font-size: 13px; font-weight: 500; font-family: system-ui, -apple-system, sans-serif; cursor: pointer; transition: all 0.15s; }
+    .visited-chip:active { transform: scale(0.96); }
+    .visited-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .card-visited-check { width: 22px; height: 22px; min-width: 22px; border-radius: 6px; border: 2px solid var(--border); background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; transition: all 0.15s; margin-top: 2px; }
+    .card-visited-check:active { transform: scale(0.9); }
+    .card-visited-check.checked { background: var(--primary); border-color: var(--primary); color: #fff; }
   </style>
 </head>
 <body>
@@ -181,7 +189,7 @@
     try {
       const raw = localStorage.getItem(DB_KEY);
       const data = raw ? JSON.parse(raw) : [];
-      data.forEach(p => { if (!p.suivis) p.suivis = []; if (p.archived === undefined) p.archived = false; });
+      data.forEach(p => { if (!p.suivis) p.suivis = []; if (p.archived === undefined) p.archived = false; if (p.visited === undefined) p.visited = false; });
       return data;
     } catch { return []; }
   }
@@ -203,7 +211,7 @@
     prisoners: loadPrisoners(),
     view: 'list', tab: 'list',
     selectedId: null, editVisitId: null,
-    search: '', suiviSearch: '', suiviFilter: 'pending', showArchived: false,
+    search: '', suiviSearch: '', suiviFilter: 'pending', showArchived: false, visitedFilter: 'all',
     sortField: 'name', sortDir: 'asc',
     form: { name: '', cell: '', date: todayStr(), notes: '', suiviText: '' },
     toast: null, confirmDelete: null,
@@ -231,7 +239,7 @@
   // ─── CRUD Actions ─────────────────────────────────────────────
   function addPrisoner() {
     if (!state.form.name.trim()) return;
-    state.prisoners.push({ id: uid(), name: state.form.name.trim(), cell: state.form.cell.trim(), visits: [], suivis: [], archived: false });
+    state.prisoners.push({ id: uid(), name: state.form.name.trim(), cell: state.form.cell.trim(), visits: [], suivis: [], archived: false, visited: false });
     save(); resetForm(); setState({ view: 'list' }); showToast('Détenu ajouté');
   }
   function updatePrisoner() {
@@ -285,6 +293,11 @@
     if (p.archived) { setState({ view: state.tab, selectedId: null }); showToast(p.name + ' archivé'); }
     else { render(); showToast(p.name + ' désarchivé'); }
   }
+  function toggleVisited(id) {
+    const p = state.prisoners.find(pr => pr.id === id); if (!p) return;
+    p.visited = !p.visited;
+    save(); render();
+  }
 
   // ─── Import / Export ──────────────────────────────────────────
   function handleImport(e) {
@@ -303,6 +316,7 @@
           const rawDate = row.Date || row.date || '';
           const notes = String(row.Notes || row.notes || row.Note || row.note || '').trim();
           const suiviText = String(row.Suivi || row.suivi || '').trim();
+          const visitedRaw = String(row.Visité || row.visité || row.Visited || row.visited || '').trim().toLowerCase();
           let dateStr = '';
           if (rawDate) {
             if (typeof rawDate === 'number') {
@@ -311,8 +325,9 @@
             } else { const parsed = new Date(rawDate); if (!isNaN(parsed)) dateStr = parsed.toISOString().slice(0, 10); }
           }
           const key = name.toLowerCase();
-          if (!grouped[key]) grouped[key] = { name, cell, visits: [], suivis: [] };
+          if (!grouped[key]) grouped[key] = { name, cell, visits: [], suivis: [], visited: false };
           if (cell && !grouped[key].cell) grouped[key].cell = cell;
+          if (visitedRaw === 'oui' || visitedRaw === 'yes' || visitedRaw === 'true' || visitedRaw === '1') grouped[key].visited = true;
           if (dateStr) grouped[key].visits.push({ id: uid(), date: dateStr, notes });
           if (suiviText) grouped[key].suivis.push({ id: uid(), text: suiviText, done: false, createdDate: todayStr(), doneDate: null });
         });
@@ -320,10 +335,11 @@
           const existing = state.prisoners.find(p => p.name.toLowerCase() === imp.name.toLowerCase());
           if (existing) {
             if (imp.cell && !existing.cell) existing.cell = imp.cell;
+            if (imp.visited) existing.visited = true;
             existing.visits = [...existing.visits, ...imp.visits].sort((a, b) => new Date(b.date) - new Date(a.date));
             existing.suivis = [...existing.suivis, ...imp.suivis];
           } else {
-            state.prisoners.push({ id: uid(), name: imp.name, cell: imp.cell, visits: imp.visits.sort((a, b) => new Date(b.date) - new Date(a.date)), suivis: imp.suivis, archived: false });
+            state.prisoners.push({ id: uid(), name: imp.name, cell: imp.cell, visits: imp.visits.sort((a, b) => new Date(b.date) - new Date(a.date)), suivis: imp.suivis, archived: false, visited: imp.visited || false });
           }
         });
         save(); setState({ view: 'list' }); showToast(Object.keys(grouped).length + ' fiche(s) importée(s)');
@@ -334,9 +350,9 @@
   function handleExport() {
     const rows = [];
     state.prisoners.forEach(p => {
-      if (p.visits.length === 0 && p.suivis.length === 0) rows.push({ Nom: p.name, Cellule: p.cell, Date: '', Notes: '', Suivi: '', 'Suivi fait': '', Archivé: p.archived ? 'Oui' : 'Non' });
-      p.visits.forEach(v => rows.push({ Nom: p.name, Cellule: p.cell, Date: v.date, Notes: v.notes, Suivi: '', 'Suivi fait': '', Archivé: p.archived ? 'Oui' : 'Non' }));
-      p.suivis.forEach(sv => rows.push({ Nom: p.name, Cellule: p.cell, Date: '', Notes: '', Suivi: sv.text, 'Suivi fait': sv.done ? 'Oui' : 'Non', Archivé: p.archived ? 'Oui' : 'Non' }));
+      if (p.visits.length === 0 && p.suivis.length === 0) rows.push({ Nom: p.name, Cellule: p.cell, Date: '', Notes: '', Suivi: '', 'Suivi fait': '', Visité: p.visited ? 'Oui' : 'Non', Archivé: p.archived ? 'Oui' : 'Non' });
+      p.visits.forEach(v => rows.push({ Nom: p.name, Cellule: p.cell, Date: v.date, Notes: v.notes, Suivi: '', 'Suivi fait': '', Visité: p.visited ? 'Oui' : 'Non', Archivé: p.archived ? 'Oui' : 'Non' }));
+      p.suivis.forEach(sv => rows.push({ Nom: p.name, Cellule: p.cell, Date: '', Notes: '', Suivi: sv.text, 'Suivi fait': sv.done ? 'Oui' : 'Non', Visité: p.visited ? 'Oui' : 'Non', Archivé: p.archived ? 'Oui' : 'Non' }));
     });
     const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Visites'); XLSX.writeFile(wb, 'visites_detenus.xlsx'); showToast('Export terminé');
@@ -378,7 +394,7 @@
   function renderList() {
     const { sortField, sortDir, showArchived } = state;
     const activePrisoners = state.prisoners.filter(p => showArchived ? p.archived : !p.archived);
-    const filtered = activePrisoners.filter(p => prisonerMatchesSearch(p, state.search)).sort((a, b) => {
+    const filtered = activePrisoners.filter(p => (state.visitedFilter === 'all' || (state.visitedFilter === 'visited' ? p.visited : !p.visited)) && prisonerMatchesSearch(p, state.search)).sort((a, b) => {
       let cmp = 0;
       if (sortField === 'name') cmp = a.name.localeCompare(b.name, 'fr');
       else if (sortField === 'cell') {
@@ -441,14 +457,23 @@
               labels[f], sortField === f ? h('span', { className: 'sort-arrow' + (sortDir === 'desc' ? ' desc' : '') }, '↑') : null);
           })
         ) : null,
+        !showArchived && activePrisoners.length > 0 ? h('div', { className: 'visited-filter-bar' },
+          h('span', { className: 'visited-filter-label' }, 'Filtre :'),
+          h('button', { className: 'visited-chip' + (state.visitedFilter === 'all' ? ' active' : ''), onClick: () => setState({ visitedFilter: 'all' }) }, 'Tous'),
+          h('button', { className: 'visited-chip' + (state.visitedFilter === 'visited' ? ' active' : ''), onClick: () => setState({ visitedFilter: 'visited' }) }, 'Visités'),
+          h('button', { className: 'visited-chip' + (state.visitedFilter === 'notVisited' ? ' active' : ''), onClick: () => setState({ visitedFilter: 'notVisited' }) }, 'Non visités')
+        ) : null,
         filtered.length === 0 && activePrisoners.length === 0 && !showArchived ? h('div', { className: 'empty' }, h('div', { className: 'empty-icon' }, '📋'), h('p', { className: 'empty-title' }, 'Aucune fiche'), h('p', { className: 'empty-text' }, 'Ajoutez un détenu ou importez un fichier Excel.')) : null,
         filtered.length === 0 && activePrisoners.length === 0 && showArchived ? h('div', { className: 'empty' }, h('div', { className: 'empty-icon' }, '📦'), h('p', { className: 'empty-title' }, 'Aucune fiche archivée'), h('p', { className: 'empty-text' }, 'Les fiches archivées apparaîtront ici.')) : null,
-        filtered.length === 0 && activePrisoners.length > 0 && state.search ? h('div', { className: 'empty' }, h('p', { className: 'empty-text' }, 'Aucun résultat pour « ' + state.search + ' »')) : null,
+        filtered.length === 0 && activePrisoners.length > 0 && (state.search || state.visitedFilter !== 'all') ? h('div', { className: 'empty' }, h('p', { className: 'empty-text' }, state.search ? 'Aucun résultat pour « ' + state.search + ' »' : 'Aucun résultat avec ce filtre.')) : null,
         ...filtered.map(p => {
           const pendingSv = p.suivis.filter(s => !s.done).length;
           return h('div', { className: 'card' + (p.archived ? ' archived' : ''), onClick: () => setState({ selectedId: p.id, view: 'detail' }) },
             h('div', { className: 'card-row' },
-              h('div', null, h('p', { className: 'card-name' }, p.name), h('p', { className: 'card-meta' }, p.cell ? 'Cellule ' + p.cell : 'Cellule non renseignée')),
+              h('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '10px', flex: '1', minWidth: '0' } },
+                h('button', { className: 'card-visited-check' + (p.visited ? ' checked' : ''), onClick: (e) => { e.stopPropagation(); toggleVisited(p.id); } }, p.visited ? '✓' : ''),
+                h('div', { style: { flex: '1', minWidth: '0' } }, h('p', { className: 'card-name' }, p.name), h('p', { className: 'card-meta' }, p.cell ? 'Cellule ' + p.cell : 'Cellule non renseignée'))
+              ),
               h('div', { className: 'badges' },
                 p.archived ? h('span', { className: 'badge badge-archive' }, '📦 Archivé') : null,
                 h('span', { className: 'badge badge-green' }, p.visits.length + ' visite' + (p.visits.length !== 1 ? 's' : '')),
@@ -524,6 +549,7 @@
           h('p', { className: 'detail-name' }, p.name),
           h('p', { className: 'detail-cell' }, p.cell ? 'Cellule ' + p.cell : 'Cellule non renseignée'),
           h('div', { className: 'detail-actions' },
+            h('button', { className: 'btn-sm ' + (p.visited ? 'btn-sm-primary-light' : 'btn-sm-card'), onClick: () => toggleVisited(p.id) }, p.visited ? '✓ Visité' : 'Non visité'),
             h('button', { className: 'btn-sm btn-sm-white', onClick: () => { state.form.name = p.name; state.form.cell = p.cell; setState({ view: 'editPrisoner' }); } }, '✏️ Modifier'),
             h('button', { className: 'btn-sm btn-sm-archive', onClick: () => toggleArchive(p.id) }, p.archived ? '📤 Désarchiver' : '📦 Archiver'),
             h('button', { className: 'btn-sm btn-sm-danger', onClick: () => setState({ confirmDelete: { type: 'prisoner', id: p.id, label: p.name } }) }, 'Supprimer')
