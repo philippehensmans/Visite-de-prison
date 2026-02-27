@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Visites">
+  <meta name="theme-color" content="#2D5A3D">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <title>Suivi Visites Détenus</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg: #F6F5F0;
+      --card: #FFFFFF;
+      --primary: #2D5A3D;
+      --primary-light: #E8F0EB;
+      --accent: #C4784A;
+      --accent-light: #FDF0E9;
+      --text: #1A1A1A;
+      --muted: #6B6B6B;
+      --border: #E2E0D8;
+      --danger: #B84233;
+      --danger-light: #FDEEEC;
+      --suivi: #8B6914;
+      --suivi-light: #FFF8E7;
+      --suivi-done: #5A9A6B;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: 'Source Serif 4', Georgia, serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; min-height: 100dvh; overscroll-behavior: none;
+    }
+    #app {
+      max-width: 480px; margin: 0 auto;
+      min-height: 100vh; min-height: 100dvh; position: relative;
+    }
+    .header {
+      background: var(--primary); color: #fff;
+      padding: calc(16px + var(--safe-top)) 20px 16px;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header h1 { font-family: 'Source Serif 4', Georgia, serif; font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+    .header-sub { font-family: system-ui, -apple-system, sans-serif; font-size: 12px; opacity: 0.75; margin-top: 2px; }
+    .back-btn { background: none; border: none; color: #fff; font-size: 15px; font-family: system-ui, -apple-system, sans-serif; cursor: pointer; padding: 0 0 8px; opacity: 0.85; }
+    .back-btn:active { opacity: 1; }
+    .tab-bar { display: flex; background: var(--card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 99; }
+    .tab-item { flex: 1; padding: 12px 8px 10px; text-align: center; font-family: system-ui, -apple-system, sans-serif; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; border: none; background: none; border-bottom: 3px solid transparent; transition: all 0.15s; position: relative; }
+    .tab-item.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .tab-item:active { opacity: 0.7; }
+    .tab-icon { font-size: 20px; display: block; margin-bottom: 2px; }
+    .tab-badge { position: absolute; top: 6px; right: calc(50% - 22px); background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; min-width: 18px; height: 18px; line-height: 18px; border-radius: 9px; padding: 0 5px; }
+    .body { padding: 16px 16px calc(100px + var(--safe-bottom)); }
+    .toolbar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .btn { border: none; border-radius: 12px; padding: 14px 20px; font-size: 15px; font-weight: 600; font-family: system-ui, -apple-system, sans-serif; cursor: pointer; width: 100%; text-align: center; transition: opacity 0.15s; }
+    .btn:active { opacity: 0.8; }
+    .btn:disabled { opacity: 0.5; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-accent { background: var(--accent); color: #fff; }
+    .btn-muted { background: var(--border); color: var(--text); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-sm { border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; font-family: system-ui, -apple-system, sans-serif; cursor: pointer; transition: opacity 0.15s; }
+    .btn-sm:active { opacity: 0.8; }
+    .btn-sm-primary-light { background: var(--primary-light); color: var(--primary); }
+    .btn-sm-accent-light { background: var(--accent-light); color: var(--accent); }
+    .btn-sm-card { background: var(--card); color: var(--muted); border: 1px solid var(--border); }
+    .btn-sm-accent { background: var(--accent); color: #fff; }
+    .btn-sm-suivi { background: var(--suivi); color: #fff; }
+    .btn-sm-white { background: var(--card); color: var(--primary); border: 1px solid var(--border); }
+    .btn-sm-danger { background: var(--danger-light); color: var(--danger); }
+    .btn-sm-icon { background: var(--primary-light); color: var(--primary); }
+    .btn-sm-icon-danger { background: var(--danger-light); color: var(--danger); }
+    .search-wrap { position: relative; margin-bottom: 16px; }
+    .search-icon { position: absolute; left: 14px; top: 13px; font-size: 16px; color: var(--muted); pointer-events: none; }
+    .search-input { width: 100%; padding: 12px 16px 12px 40px; border: 1px solid var(--border); border-radius: 12px; font-size: 15px; font-family: system-ui, -apple-system, sans-serif; background: var(--card); outline: none; }
+    .search-input:focus { border-color: var(--primary); }
+    .card { background: var(--card); border-radius: 14px; padding: 16px 18px; margin-bottom: 10px; border: 1px solid var(--border); cursor: pointer; transition: transform 0.1s; }
+    .card:active { transform: scale(0.98); }
+    .card-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .card-name { font-size: 17px; font-weight: 600; }
+    .card-meta { font-size: 13px; color: var(--muted); margin-top: 4px; font-family: system-ui, -apple-system, sans-serif; }
+    .card-last { font-size: 12px; margin-top: 8px; }
+    .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 20px; font-family: system-ui, -apple-system, sans-serif; white-space: nowrap; }
+    .badge-green { background: var(--primary-light); color: var(--primary); }
+    .badge-yellow { background: var(--suivi-light); color: var(--suivi); }
+    .badges { display: flex; gap: 4px; flex-wrap: wrap; flex-shrink: 0; }
+    .detail-header { background: var(--primary-light); border-radius: 14px; padding: 20px 18px; margin-bottom: 20px; }
+    .detail-name { font-size: 22px; font-weight: 700; color: var(--primary); }
+    .detail-cell { font-size: 14px; color: var(--muted); margin-top: 4px; font-family: system-ui, -apple-system, sans-serif; }
+    .detail-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .section-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .section-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; font-family: system-ui, -apple-system, sans-serif; }
+    .visit-card { background: var(--card); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; border: 1px solid var(--border); border-left: 4px solid var(--accent); }
+    .visit-date { font-size: 14px; font-weight: 600; color: var(--accent); font-family: system-ui, -apple-system, sans-serif; }
+    .visit-notes { font-size: 15px; margin-top: 6px; line-height: 1.5; white-space: pre-wrap; }
+    .visit-actions { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+    .suivi-card { background: var(--card); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; border: 1px solid var(--border); border-left: 4px solid var(--suivi); display: flex; gap: 12px; align-items: flex-start; }
+    .suivi-card.done { border-left-color: var(--suivi-done); opacity: 0.65; }
+    .suivi-checkbox { width: 26px; height: 26px; min-width: 26px; border-radius: 6px; border: 2px solid var(--suivi); background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; margin-top: 1px; transition: all 0.15s; }
+    .suivi-checkbox:active { transform: scale(0.9); }
+    .suivi-checkbox.checked { background: var(--suivi-done); border-color: var(--suivi-done); color: #fff; }
+    .suivi-content { flex: 1; min-width: 0; }
+    .suivi-text { font-size: 15px; line-height: 1.4; }
+    .suivi-text.done-text { text-decoration: line-through; color: var(--muted); }
+    .suivi-meta { font-size: 12px; color: var(--muted); margin-top: 4px; font-family: system-ui, -apple-system, sans-serif; }
+    .suivi-prisoner-name { font-size: 13px; font-weight: 600; color: var(--primary); font-family: system-ui, -apple-system, sans-serif; margin-bottom: 2px; cursor: pointer; }
+    .suivi-prisoner-name:active { text-decoration: underline; }
+    .suivi-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .filter-bar { display: flex; gap: 6px; margin-bottom: 14px; }
+    .filter-chip { border: 1px solid var(--border); background: var(--card); color: var(--muted); border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 500; font-family: system-ui, -apple-system, sans-serif; cursor: pointer; transition: all 0.15s; }
+    .filter-chip:active { transform: scale(0.96); }
+    .filter-chip.active { background: var(--suivi); color: #fff; border-color: var(--suivi); }
+    .sort-bar { display: flex; gap: 6px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+    .sort-label { font-size: 12px; color: var(--muted); font-family: system-ui, -apple-system, sans-serif; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; margin-right: 2px; }
+    .sort-chip { border: 1px solid var(--border); background: var(--card); color: var(--muted); border-radius: 20px; padding: 6px 12px; font-size: 13px; font-weight: 500; font-family: system-ui, -apple-system, sans-serif; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 4px; }
+    .sort-chip:active { transform: scale(0.96); }
+    .sort-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .sort-arrow { font-size: 11px; display: inline-block; transition: transform 0.2s; }
+    .sort-arrow.desc { transform: rotate(180deg); }
+    .field-group { margin-bottom: 18px; }
+    .field-label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 6px; font-family: system-ui, -apple-system, sans-serif; text-transform: uppercase; letter-spacing: 0.5px; }
+    .field-input { width: 100%; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; font-size: 16px; font-family: system-ui, -apple-system, sans-serif; background: var(--card); outline: none; -webkit-appearance: none; }
+    .field-input:focus { border-color: var(--primary); }
+    .field-textarea { width: 100%; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; font-size: 16px; font-family: system-ui, -apple-system, sans-serif; background: var(--card); outline: none; min-height: 140px; resize: vertical; -webkit-appearance: none; }
+    .field-textarea:focus { border-color: var(--primary); }
+    .import-info { background: var(--accent-light); border-radius: 12px; padding: 16px 18px; margin-bottom: 20px; font-size: 14px; line-height: 1.7; font-family: system-ui, -apple-system, sans-serif; }
+    .import-info strong { color: var(--accent); }
+    .col-tag { font-family: 'SF Mono', 'Menlo', monospace; background: #fff; padding: 2px 8px; border-radius: 4px; font-size: 13px; display: inline-block; margin: 2px 2px; }
+    .empty { text-align: center; padding: 48px 20px; color: var(--muted); }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
+    .empty-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+    .empty-text { font-size: 14px; font-family: system-ui, -apple-system, sans-serif; }
+    .toast { position: fixed; bottom: calc(28px + var(--safe-bottom)); left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 10px 24px; border-radius: 24px; font-size: 14px; font-family: system-ui, -apple-system, sans-serif; z-index: 200; box-shadow: 0 4px 20px rgba(0,0,0,0.2); animation: toastIn 0.25s ease; }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(12px); } }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 300; padding: 20px; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; } }
+    .modal { background: var(--card); border-radius: 16px; padding: 24px; max-width: 320px; width: 100%; animation: modalIn 0.25s ease; }
+    @keyframes modalIn { from { opacity: 0; transform: scale(0.95); } }
+    .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+    .modal-text { font-size: 14px; color: var(--muted); margin-bottom: 20px; font-family: system-ui, -apple-system, sans-serif; }
+    .modal-btns { display: flex; gap: 10px; }
+    .modal-btns .btn { padding: 12px 16px; }
+    .install-banner { background: var(--primary-light); border: 1px solid var(--primary); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .install-banner-text { font-size: 13px; font-family: system-ui, -apple-system, sans-serif; color: var(--primary); flex: 1; }
+    .install-banner .close-x { background: none; border: none; color: var(--primary); font-size: 18px; cursor: pointer; padding: 4px; opacity: 0.6; }
+    .view { animation: slideIn 0.2s ease; }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(8px); } }
+    .stats-bar { display: flex; gap: 10px; margin-bottom: 16px; }
+    .stat-item { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; text-align: center; }
+    .stat-value { font-size: 20px; font-weight: 700; color: var(--primary); }
+    .stat-value-yellow { font-size: 20px; font-weight: 700; color: var(--suivi); }
+    .stat-label { font-size: 11px; color: var(--muted); font-family: system-ui, -apple-system, sans-serif; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
+    .inline-add { display: flex; gap: 8px; margin-bottom: 14px; }
+    .inline-add .field-input { flex: 1; padding: 10px 14px; font-size: 15px; }
+    .inline-add .btn-sm { white-space: nowrap; align-self: stretch; }
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+    .card.archived { opacity: 0.55; border-style: dashed; }
+    .badge-archive { background: #EEE; color: #888; }
+    .btn-sm-archive { background: #F0EDE6; color: #7A7560; }
+    .archive-banner { background: #F0EDE6; border: 1px dashed #C5C0B0; border-radius: 12px; padding: 10px 16px; margin-bottom: 16px; font-size: 13px; font-family: system-ui, -apple-system, sans-serif; color: #7A7560; display: flex; align-items: center; gap: 8px; }
+    .archive-toggle { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+    .archive-toggle-btn { border: 1px solid var(--border); background: var(--card); color: var(--muted); border-radius: 20px; padding: 6px 14px; font-size: 13px; font-weight: 500; font-family: system-ui, -apple-system, sans-serif; cursor: pointer; transition: all 0.15s; }
+    .archive-toggle-btn:active { transform: scale(0.96); }
+    .archive-toggle-btn.active { background: #7A7560; color: #fff; border-color: #7A7560; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  const DB_KEY = 'visites_detenus';
+
+  function loadPrisoners() {
+    try {
+      const raw = localStorage.getItem(DB_KEY);
+      const data = raw ? JSON.parse(raw) : [];
+      data.forEach(p => { if (!p.suivis) p.suivis = []; if (p.archived === undefined) p.archived = false; });
+      return data;
+    } catch { return []; }
+  }
+  function savePrisoners(data) { localStorage.setItem(DB_KEY, JSON.stringify(data)); }
+
+  let _idCounter = Date.now();
+  function uid() { return 'id_' + (_idCounter++); }
+  function todayStr() { return new Date().toISOString().slice(0, 10); }
+  function formatDate(d) {
+    if (!d) return '';
+    return new Date(d + 'T00:00:00').toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  function formatDateShort(d) {
+    if (!d) return '';
+    return new Date(d + 'T00:00:00').toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' });
+  }
+
+  const state = {
+    prisoners: loadPrisoners(),
+    view: 'list', tab: 'list',
+    selectedId: null, editVisitId: null,
+    search: '', suiviSearch: '', suiviFilter: 'pending', showArchived: false,
+    sortField: 'name', sortDir: 'asc',
+    form: { name: '', cell: '', date: todayStr(), notes: '', suiviText: '' },
+    toast: null, confirmDelete: null,
+    showInstall: !localStorage.getItem('install_dismissed') && /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.navigator.standalone,
+  };
+
+  function setState(patch) { Object.assign(state, patch); render(); }
+  function save() { savePrisoners(state.prisoners); }
+  function showToast(msg) { state.toast = msg; render(); setTimeout(() => { state.toast = null; render(); }, 2500); }
+  function resetForm() { state.form = { name: '', cell: '', date: todayStr(), notes: '', suiviText: '' }; }
+  function getSelected() { return state.prisoners.find(p => p.id === state.selectedId); }
+  function totalVisits() { return state.prisoners.filter(p => !p.archived).reduce((s, p) => s + p.visits.length, 0); }
+  function totalPendingSuivis() { return state.prisoners.filter(p => !p.archived).reduce((s, p) => s + p.suivis.filter(sv => !sv.done).length, 0); }
+  function totalArchived() { return state.prisoners.filter(p => p.archived).length; }
+
+  function prisonerMatchesSearch(p, q) {
+    if (!q) return true;
+    const low = q.toLowerCase();
+    return p.name.toLowerCase().includes(low) ||
+      p.cell.toLowerCase().includes(low) ||
+      p.visits.some(v => v.notes.toLowerCase().includes(low)) ||
+      p.suivis.some(sv => sv.text.toLowerCase().includes(low));
+  }
+
+  // ─── CRUD Actions ─────────────────────────────────────────────
+  function addPrisoner() {
+    if (!state.form.name.trim()) return;
+    state.prisoners.push({ id: uid(), name: state.form.name.trim(), cell: state.form.cell.trim(), visits: [], suivis: [], archived: false });
+    save(); resetForm(); setState({ view: 'list' }); showToast('Détenu ajouté');
+  }
+  function updatePrisoner() {
+    const p = getSelected(); if (!p || !state.form.name.trim()) return;
+    p.name = state.form.name.trim(); p.cell = state.form.cell.trim();
+    save(); resetForm(); setState({ view: 'detail' }); showToast('Fiche modifiée');
+  }
+  function deletePrisoner(id) {
+    state.prisoners = state.prisoners.filter(p => p.id !== id);
+    save(); setState({ view: state.tab, selectedId: null, confirmDelete: null }); showToast('Fiche supprimée');
+  }
+  function addVisit() {
+    const p = getSelected(); if (!p || !state.form.date) return;
+    p.visits.push({ id: uid(), date: state.form.date, notes: state.form.notes.trim() });
+    p.visits.sort((a, b) => new Date(b.date) - new Date(a.date));
+    save(); resetForm(); setState({ view: 'detail' }); showToast('Visite ajoutée');
+  }
+  function updateVisit() {
+    const p = getSelected(); if (!p) return;
+    const v = p.visits.find(v => v.id === state.editVisitId); if (!v) return;
+    v.date = state.form.date; v.notes = state.form.notes.trim();
+    p.visits.sort((a, b) => new Date(b.date) - new Date(a.date));
+    save(); resetForm(); setState({ view: 'detail', editVisitId: null }); showToast('Visite modifiée');
+  }
+  function deleteVisit(visitId) {
+    const p = getSelected(); if (!p) return;
+    p.visits = p.visits.filter(v => v.id !== visitId);
+    save(); setState({ confirmDelete: null }); showToast('Visite supprimée');
+  }
+  function addSuivi(prisonerId) {
+    const p = state.prisoners.find(pr => pr.id === prisonerId); if (!p) return;
+    const text = state.form.suiviText.trim(); if (!text) return;
+    p.suivis.push({ id: uid(), text, done: false, createdDate: todayStr(), doneDate: null });
+    save(); state.form.suiviText = ''; render(); showToast('Suivi ajouté');
+  }
+  function toggleSuivi(prisonerId, suiviId) {
+    const p = state.prisoners.find(pr => pr.id === prisonerId); if (!p) return;
+    const sv = p.suivis.find(s => s.id === suiviId); if (!sv) return;
+    sv.done = !sv.done; sv.doneDate = sv.done ? todayStr() : null;
+    save(); render();
+  }
+  function deleteSuivi(prisonerId, suiviId) {
+    const p = state.prisoners.find(pr => pr.id === prisonerId); if (!p) return;
+    p.suivis = p.suivis.filter(s => s.id !== suiviId);
+    save(); setState({ confirmDelete: null }); showToast('Suivi supprimé');
+  }
+  function toggleArchive(id) {
+    const p = state.prisoners.find(pr => pr.id === id); if (!p) return;
+    p.archived = !p.archived;
+    save();
+    if (p.archived) { setState({ view: state.tab, selectedId: null }); showToast(p.name + ' archivé'); }
+    else { render(); showToast(p.name + ' désarchivé'); }
+  }
+
+  // ─── Import / Export ──────────────────────────────────────────
+  function handleImport(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      try {
+        const wb = XLSX.read(evt.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        const grouped = {};
+        rows.forEach(row => {
+          const name = String(row.Nom || row.nom || row.Name || row.name || '').trim();
+          if (!name) return;
+          const cell = String(row.Cellule || row.cellule || row.Cell || row.cell || '').trim();
+          const rawDate = row.Date || row.date || '';
+          const notes = String(row.Notes || row.notes || row.Note || row.note || '').trim();
+          const suiviText = String(row.Suivi || row.suivi || '').trim();
+          let dateStr = '';
+          if (rawDate) {
+            if (typeof rawDate === 'number') {
+              const d = XLSX.SSF.parse_date_code(rawDate);
+              dateStr = d.y + '-' + String(d.m).padStart(2, '0') + '-' + String(d.d).padStart(2, '0');
+            } else { const parsed = new Date(rawDate); if (!isNaN(parsed)) dateStr = parsed.toISOString().slice(0, 10); }
+          }
+          const key = name.toLowerCase();
+          if (!grouped[key]) grouped[key] = { name, cell, visits: [], suivis: [] };
+          if (cell && !grouped[key].cell) grouped[key].cell = cell;
+          if (dateStr) grouped[key].visits.push({ id: uid(), date: dateStr, notes });
+          if (suiviText) grouped[key].suivis.push({ id: uid(), text: suiviText, done: false, createdDate: todayStr(), doneDate: null });
+        });
+        Object.values(grouped).forEach(imp => {
+          const existing = state.prisoners.find(p => p.name.toLowerCase() === imp.name.toLowerCase());
+          if (existing) {
+            if (imp.cell && !existing.cell) existing.cell = imp.cell;
+            existing.visits = [...existing.visits, ...imp.visits].sort((a, b) => new Date(b.date) - new Date(a.date));
+            existing.suivis = [...existing.suivis, ...imp.suivis];
+          } else {
+            state.prisoners.push({ id: uid(), name: imp.name, cell: imp.cell, visits: imp.visits.sort((a, b) => new Date(b.date) - new Date(a.date)), suivis: imp.suivis, archived: false });
+          }
+        });
+        save(); setState({ view: 'list' }); showToast(Object.keys(grouped).length + ' fiche(s) importée(s)');
+      } catch (err) { console.error(err); showToast("Erreur lors de l'import"); }
+    };
+    reader.readAsArrayBuffer(file); e.target.value = '';
+  }
+  function handleExport() {
+    const rows = [];
+    state.prisoners.forEach(p => {
+      if (p.visits.length === 0 && p.suivis.length === 0) rows.push({ Nom: p.name, Cellule: p.cell, Date: '', Notes: '', Suivi: '', 'Suivi fait': '', Archivé: p.archived ? 'Oui' : 'Non' });
+      p.visits.forEach(v => rows.push({ Nom: p.name, Cellule: p.cell, Date: v.date, Notes: v.notes, Suivi: '', 'Suivi fait': '', Archivé: p.archived ? 'Oui' : 'Non' }));
+      p.suivis.forEach(sv => rows.push({ Nom: p.name, Cellule: p.cell, Date: '', Notes: '', Suivi: sv.text, 'Suivi fait': sv.done ? 'Oui' : 'Non', Archivé: p.archived ? 'Oui' : 'Non' }));
+    });
+    const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Visites'); XLSX.writeFile(wb, 'visites_detenus.xlsx'); showToast('Export terminé');
+  }
+
+  // ─── Render Engine ────────────────────────────────────────────
+  function h(tag, attrs, ...children) {
+    const el = document.createElement(tag);
+    if (attrs) Object.entries(attrs).forEach(([k, v]) => {
+      if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+      else if (k.startsWith('on')) el.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === 'className') el.className = v;
+      else if (k === 'htmlContent') el.innerHTML = v;
+      else el.setAttribute(k, v);
+    });
+    children.flat(Infinity).forEach(c => { if (c == null || c === false) return; el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return el;
+  }
+  function render() {
+    const app = document.getElementById('app'); app.innerHTML = '';
+    const views = { list: renderList, suivis: renderSuivisGlobal, detail: renderDetail, addPrisoner: () => renderPrisonerForm(false), editPrisoner: () => renderPrisonerForm(true), addVisit: () => renderVisitForm(false), editVisit: () => renderVisitForm(true), import: renderImport };
+    const fn = views[state.view]; if (fn) app.appendChild(fn());
+    if (state.toast) app.appendChild(h('div', { className: 'toast' }, state.toast));
+    if (state.confirmDelete) app.appendChild(renderConfirmModal());
+  }
+
+  function renderTabBar() {
+    const pending = totalPendingSuivis();
+    return h('div', { className: 'tab-bar' },
+      h('button', { className: 'tab-item' + (state.tab === 'list' ? ' active' : ''), onClick: () => setState({ view: 'list', tab: 'list' }) },
+        h('span', { className: 'tab-icon' }, '👥'), 'Détenus'),
+      h('button', { className: 'tab-item' + (state.tab === 'suivis' ? ' active' : ''), onClick: () => setState({ view: 'suivis', tab: 'suivis' }) },
+        h('span', { className: 'tab-icon' }, '📋'), 'Suivis',
+        pending > 0 ? h('span', { className: 'tab-badge' }, String(pending)) : null)
+    );
+  }
+
+  // ─── LIST VIEW ────────────────────────────────────────────────
+  function renderList() {
+    const { sortField, sortDir, showArchived } = state;
+    const activePrisoners = state.prisoners.filter(p => showArchived ? p.archived : !p.archived);
+    const filtered = activePrisoners.filter(p => prisonerMatchesSearch(p, state.search)).sort((a, b) => {
+      let cmp = 0;
+      if (sortField === 'name') cmp = a.name.localeCompare(b.name, 'fr');
+      else if (sortField === 'cell') {
+        if (!a.cell && b.cell) return 1; if (a.cell && !b.cell) return -1;
+        const nA = a.cell.match(/\d+/), nB = b.cell.match(/\d+/);
+        cmp = (nA && nB) ? parseInt(nA[0]) - parseInt(nB[0]) || a.cell.localeCompare(b.cell, 'fr') : a.cell.localeCompare(b.cell, 'fr');
+      } else if (sortField === 'lastVisit') {
+        const dA = a.visits[0]?.date || '', dB = b.visits[0]?.date || '';
+        if (!dA && dB) return 1; if (dA && !dB) return -1; cmp = dA.localeCompare(dB);
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    const activeCount = state.prisoners.filter(p => !p.archived).length;
+    const archivedCount = totalArchived();
+    const vCount = totalVisits(), svCount = totalPendingSuivis();
+    function toggleSort(field) { if (state.sortField === field) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc'; else { state.sortField = field; state.sortDir = 'asc'; } render(); }
+
+    return h('div', { className: 'view' },
+      h('div', { className: 'header' },
+        h('h1', null, showArchived ? 'Fiches archivées' : 'Suivi des visites'),
+        h('div', { className: 'header-sub' }, showArchived
+          ? archivedCount + ' fiche' + (archivedCount !== 1 ? 's' : '') + ' archivée' + (archivedCount !== 1 ? 's' : '')
+          : activeCount + ' détenu' + (activeCount !== 1 ? 's' : '') + ' enregistré' + (activeCount !== 1 ? 's' : ''))
+      ),
+      renderTabBar(),
+      h('div', { className: 'body' },
+        state.showInstall && !showArchived ? h('div', { className: 'install-banner' },
+          h('div', { className: 'install-banner-text' }, 'Pour installer : ', h('strong', null, 'Partager ⬆'), ' puis ', h('strong', null, '« Sur l\'écran d\'accueil »')),
+          h('button', { className: 'close-x', onClick: () => { localStorage.setItem('install_dismissed', '1'); setState({ showInstall: false }); } }, '×')
+        ) : null,
+
+        // Archive mode banner
+        showArchived ? h('div', { className: 'archive-banner' },
+          '📦', h('span', null, 'Vous consultez les fiches archivées.'),
+          h('button', { className: 'btn-sm btn-sm-primary-light', style: { marginLeft: 'auto' }, onClick: () => setState({ showArchived: false }) }, '← Fiches actives')
+        ) : null,
+
+        !showArchived && activeCount > 0 ? h('div', { className: 'stats-bar' },
+          h('div', { className: 'stat-item' }, h('div', { className: 'stat-value' }, String(activeCount)), h('div', { className: 'stat-label' }, 'Détenus')),
+          h('div', { className: 'stat-item' }, h('div', { className: 'stat-value' }, String(vCount)), h('div', { className: 'stat-label' }, 'Visites')),
+          h('div', { className: 'stat-item' }, h('div', { className: svCount > 0 ? 'stat-value-yellow' : 'stat-value' }, String(svCount)), h('div', { className: 'stat-label' }, 'Suivis'))
+        ) : null,
+
+        !showArchived ? h('div', { className: 'toolbar' },
+          h('button', { className: 'btn-sm btn-sm-primary-light', onClick: () => { resetForm(); setState({ view: 'addPrisoner' }); } }, '+ Nouveau détenu'),
+          h('button', { className: 'btn-sm btn-sm-accent-light', onClick: () => setState({ view: 'import' }) }, '↑ Importer'),
+          activeCount > 0 ? h('button', { className: 'btn-sm btn-sm-card', onClick: handleExport }, '↓ Exporter') : null,
+          archivedCount > 0 ? h('button', { className: 'btn-sm btn-sm-archive', onClick: () => setState({ showArchived: true, search: '' }) }, '📦 Archives (' + archivedCount + ')') : null
+        ) : null,
+
+        h('div', { className: 'search-wrap' },
+          h('span', { className: 'search-icon' }, '🔍'),
+          h('input', { className: 'search-input', type: 'text', placeholder: 'Rechercher nom, cellule, notes…', value: state.search, onInput: (e) => { state.search = e.target.value; render(); } })
+        ),
+        activePrisoners.length > 1 ? h('div', { className: 'sort-bar' },
+          h('span', { className: 'sort-label' }, 'Trier :'),
+          ...['name', 'cell', 'lastVisit'].map(f => {
+            const labels = { name: 'Nom', cell: 'Cellule', lastVisit: 'Dernière visite' };
+            return h('button', { className: 'sort-chip' + (sortField === f ? ' active' : ''), onClick: () => toggleSort(f) },
+              labels[f], sortField === f ? h('span', { className: 'sort-arrow' + (sortDir === 'desc' ? ' desc' : '') }, '↑') : null);
+          })
+        ) : null,
+        filtered.length === 0 && activePrisoners.length === 0 && !showArchived ? h('div', { className: 'empty' }, h('div', { className: 'empty-icon' }, '📋'), h('p', { className: 'empty-title' }, 'Aucune fiche'), h('p', { className: 'empty-text' }, 'Ajoutez un détenu ou importez un fichier Excel.')) : null,
+        filtered.length === 0 && activePrisoners.length === 0 && showArchived ? h('div', { className: 'empty' }, h('div', { className: 'empty-icon' }, '📦'), h('p', { className: 'empty-title' }, 'Aucune fiche archivée'), h('p', { className: 'empty-text' }, 'Les fiches archivées apparaîtront ici.')) : null,
+        filtered.length === 0 && activePrisoners.length > 0 && state.search ? h('div', { className: 'empty' }, h('p', { className: 'empty-text' }, 'Aucun résultat pour « ' + state.search + ' »')) : null,
+        ...filtered.map(p => {
+          const pendingSv = p.suivis.filter(s => !s.done).length;
+          return h('div', { className: 'card' + (p.archived ? ' archived' : ''), onClick: () => setState({ selectedId: p.id, view: 'detail' }) },
+            h('div', { className: 'card-row' },
+              h('div', null, h('p', { className: 'card-name' }, p.name), h('p', { className: 'card-meta' }, p.cell ? 'Cellule ' + p.cell : 'Cellule non renseignée')),
+              h('div', { className: 'badges' },
+                p.archived ? h('span', { className: 'badge badge-archive' }, '📦 Archivé') : null,
+                h('span', { className: 'badge badge-green' }, p.visits.length + ' visite' + (p.visits.length !== 1 ? 's' : '')),
+                pendingSv > 0 ? h('span', { className: 'badge badge-yellow' }, pendingSv + ' suivi' + (pendingSv > 1 ? 's' : '')) : null
+              )
+            ),
+            p.visits.length > 0 ? h('p', { className: 'card-meta card-last' }, 'Dernière visite : ' + formatDate(p.visits[0].date)) : null
+          );
+        })
+      )
+    );
+  }
+
+  // ─── SUIVIS GLOBAL VIEW ───────────────────────────────────────
+  function renderSuivisGlobal() {
+    let allSuivis = [];
+    state.prisoners.filter(p => !p.archived).forEach(p => p.suivis.forEach(sv => allSuivis.push({ ...sv, prisonerId: p.id, prisonerName: p.name, prisonerCell: p.cell })));
+    if (state.suiviFilter === 'pending') allSuivis = allSuivis.filter(sv => !sv.done);
+    else if (state.suiviFilter === 'done') allSuivis = allSuivis.filter(sv => sv.done);
+    if (state.suiviSearch) { const q = state.suiviSearch.toLowerCase(); allSuivis = allSuivis.filter(sv => sv.text.toLowerCase().includes(q) || sv.prisonerName.toLowerCase().includes(q) || sv.prisonerCell.toLowerCase().includes(q)); }
+    allSuivis.sort((a, b) => { if (a.done !== b.done) return a.done ? 1 : -1; return ((b.done ? b.doneDate : b.createdDate) || '').localeCompare((a.done ? a.doneDate : a.createdDate) || ''); });
+    const pendingCount = state.prisoners.filter(p => !p.archived).reduce((s, p) => s + p.suivis.filter(sv => !sv.done).length, 0);
+    const doneCount = state.prisoners.filter(p => !p.archived).reduce((s, p) => s + p.suivis.filter(sv => sv.done).length, 0);
+
+    return h('div', { className: 'view' },
+      h('div', { className: 'header' }, h('h1', null, 'Tous les suivis'), h('div', { className: 'header-sub' }, pendingCount + ' en attente · ' + doneCount + ' terminé' + (doneCount > 1 ? 's' : ''))),
+      renderTabBar(),
+      h('div', { className: 'body' },
+        h('div', { className: 'search-wrap' }, h('span', { className: 'search-icon' }, '🔍'),
+          h('input', { className: 'search-input', type: 'text', placeholder: 'Rechercher un suivi…', value: state.suiviSearch, onInput: (e) => { state.suiviSearch = e.target.value; render(); } })),
+        h('div', { className: 'filter-bar' },
+          h('button', { className: 'filter-chip' + (state.suiviFilter === 'pending' ? ' active' : ''), onClick: () => setState({ suiviFilter: 'pending' }) }, 'À faire (' + pendingCount + ')'),
+          h('button', { className: 'filter-chip' + (state.suiviFilter === 'done' ? ' active' : ''), onClick: () => setState({ suiviFilter: 'done' }) }, 'Fait (' + doneCount + ')'),
+          h('button', { className: 'filter-chip' + (state.suiviFilter === 'all' ? ' active' : ''), onClick: () => setState({ suiviFilter: 'all' }) }, 'Tout (' + (pendingCount + doneCount) + ')')
+        ),
+        allSuivis.length === 0 ? h('div', { className: 'empty' },
+          h('div', { className: 'empty-icon' }, state.suiviFilter === 'pending' ? '✅' : '📋'),
+          h('p', { className: 'empty-title' }, state.suiviFilter === 'pending' ? 'Tout est à jour !' : 'Aucun suivi'),
+          h('p', { className: 'empty-text' }, state.suiviFilter === 'pending' ? 'Aucun suivi en attente.' : 'Ajoutez des suivis depuis la fiche d\'un détenu.')
+        ) : null,
+        ...allSuivis.map(sv =>
+          h('div', { className: 'suivi-card' + (sv.done ? ' done' : '') },
+            h('button', { className: 'suivi-checkbox' + (sv.done ? ' checked' : ''), onClick: () => toggleSuivi(sv.prisonerId, sv.id) }, sv.done ? '✓' : ''),
+            h('div', { className: 'suivi-content' },
+              h('div', { className: 'suivi-prisoner-name', onClick: () => setState({ selectedId: sv.prisonerId, view: 'detail', tab: 'list' }) }, sv.prisonerName + (sv.prisonerCell ? ' · ' + sv.prisonerCell : '')),
+              h('div', { className: 'suivi-text' + (sv.done ? ' done-text' : '') }, sv.text),
+              h('div', { className: 'suivi-meta' }, sv.done ? 'Fait le ' + formatDateShort(sv.doneDate) : 'Créé le ' + formatDateShort(sv.createdDate)),
+              h('div', { className: 'suivi-actions' }, h('button', { className: 'btn-sm btn-sm-icon-danger', onClick: () => setState({ confirmDelete: { type: 'suivi', prisonerId: sv.prisonerId, id: sv.id, label: sv.text.slice(0, 40) } }) }, '🗑'))
+            )
+          )
+        )
+      )
+    );
+  }
+
+  // ─── DETAIL VIEW ──────────────────────────────────────────────
+  function renderDetail() {
+    const p = getSelected(); if (!p) { setState({ view: 'list' }); return h('div'); }
+    const pendingSuivis = p.suivis.filter(s => !s.done), doneSuivis = p.suivis.filter(s => s.done);
+
+    return h('div', { className: 'view' },
+      h('div', { className: 'header' },
+        h('button', { className: 'back-btn', onClick: () => setState({ view: state.tab }) }, '← Retour'),
+        h('h1', null, p.name)),
+      h('div', { className: 'body' },
+        // Archive banner
+        p.archived ? h('div', { className: 'archive-banner', style: { marginBottom: '16px' } },
+          '📦', h('span', null, 'Cette fiche est archivée'),
+          h('button', { className: 'btn-sm btn-sm-primary-light', style: { marginLeft: 'auto' }, onClick: () => toggleArchive(p.id) }, 'Désarchiver')
+        ) : null,
+
+        h('div', { className: 'detail-header' },
+          h('p', { className: 'detail-name' }, p.name),
+          h('p', { className: 'detail-cell' }, p.cell ? 'Cellule ' + p.cell : 'Cellule non renseignée'),
+          h('div', { className: 'detail-actions' },
+            h('button', { className: 'btn-sm btn-sm-white', onClick: () => { state.form.name = p.name; state.form.cell = p.cell; setState({ view: 'editPrisoner' }); } }, '✏️ Modifier'),
+            h('button', { className: 'btn-sm btn-sm-archive', onClick: () => toggleArchive(p.id) }, p.archived ? '📤 Désarchiver' : '📦 Archiver'),
+            h('button', { className: 'btn-sm btn-sm-danger', onClick: () => setState({ confirmDelete: { type: 'prisoner', id: p.id, label: p.name } }) }, 'Supprimer')
+          )
+        ),
+
+        // Suivis section
+        h('div', { className: 'section-row' }, h('p', { className: 'section-title' }, 'Suivis (' + pendingSuivis.length + ' à faire)')),
+        h('div', { className: 'inline-add' },
+          h('input', { className: 'field-input', type: 'text', placeholder: 'Nouveau suivi…', value: state.form.suiviText, onInput: (e) => { state.form.suiviText = e.target.value; }, onKeydown: (e) => { if (e.key === 'Enter') addSuivi(p.id); } }),
+          h('button', { className: 'btn-sm btn-sm-suivi', onClick: () => addSuivi(p.id) }, '+ Ajouter')
+        ),
+        ...pendingSuivis.map(sv =>
+          h('div', { className: 'suivi-card' },
+            h('button', { className: 'suivi-checkbox', onClick: () => toggleSuivi(p.id, sv.id) }, ''),
+            h('div', { className: 'suivi-content' },
+              h('div', { className: 'suivi-text' }, sv.text),
+              h('div', { className: 'suivi-meta' }, 'Créé le ' + formatDateShort(sv.createdDate)),
+              h('div', { className: 'suivi-actions' }, h('button', { className: 'btn-sm btn-sm-icon-danger', onClick: () => setState({ confirmDelete: { type: 'suivi', prisonerId: p.id, id: sv.id, label: sv.text.slice(0, 40) } }) }, '🗑'))
+            )
+          )
+        ),
+        doneSuivis.length > 0 ? h('details', { style: { marginBottom: '20px' } },
+          h('summary', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--muted)', fontFamily: 'system-ui, -apple-system, sans-serif', cursor: 'pointer', padding: '8px 0' } },
+            '✅ ' + doneSuivis.length + ' terminé' + (doneSuivis.length > 1 ? 's' : '') + ' ▸'),
+          ...doneSuivis.map(sv =>
+            h('div', { className: 'suivi-card done' },
+              h('button', { className: 'suivi-checkbox checked', onClick: () => toggleSuivi(p.id, sv.id) }, '✓'),
+              h('div', { className: 'suivi-content' },
+                h('div', { className: 'suivi-text done-text' }, sv.text),
+                h('div', { className: 'suivi-meta' }, 'Fait le ' + formatDateShort(sv.doneDate)),
+                h('div', { className: 'suivi-actions' }, h('button', { className: 'btn-sm btn-sm-icon-danger', onClick: () => setState({ confirmDelete: { type: 'suivi', prisonerId: p.id, id: sv.id, label: sv.text.slice(0, 40) } }) }, '🗑'))
+              )
+            )
+          )
+        ) : null,
+
+        // Visites section
+        h('div', { className: 'section-row', style: { marginTop: '8px' } },
+          h('p', { className: 'section-title' }, 'Visites (' + p.visits.length + ')'),
+          h('button', { className: 'btn-sm btn-sm-accent', onClick: () => { state.form.date = todayStr(); state.form.notes = ''; setState({ view: 'addVisit' }); } }, '+ Ajouter')
+        ),
+        p.visits.length === 0 ? h('div', { className: 'empty' }, h('p', { className: 'empty-text' }, 'Aucune visite enregistrée.')) : null,
+        ...p.visits.map(v =>
+          h('div', { className: 'visit-card' },
+            h('div', { className: 'visit-date' }, formatDate(v.date)),
+            v.notes ? h('div', { className: 'visit-notes' }, v.notes) : null,
+            h('div', { className: 'visit-actions' },
+              h('button', { className: 'btn-sm btn-sm-icon', onClick: () => { state.editVisitId = v.id; state.form.date = v.date; state.form.notes = v.notes; setState({ view: 'editVisit' }); } }, '✏️'),
+              h('button', { className: 'btn-sm btn-sm-icon-danger', onClick: () => setState({ confirmDelete: { type: 'visit', id: v.id, label: formatDate(v.date) } }) }, '🗑')
+            )
+          )
+        )
+      )
+    );
+  }
+
+  // ─── Forms ────────────────────────────────────────────────────
+  function renderPrisonerForm(isEdit) {
+    return h('div', { className: 'view' },
+      h('div', { className: 'header' },
+        h('button', { className: 'back-btn', onClick: () => { resetForm(); setState({ view: isEdit ? 'detail' : 'list' }); } }, '← Annuler'),
+        h('h1', null, isEdit ? 'Modifier la fiche' : 'Nouveau détenu')),
+      h('div', { className: 'body' },
+        h('div', { className: 'field-group' }, h('label', { className: 'field-label' }, 'Nom complet'),
+          h('input', { className: 'field-input', type: 'text', placeholder: 'Nom du détenu', value: state.form.name, onInput: (e) => { state.form.name = e.target.value; }, autofocus: 'true' })),
+        h('div', { className: 'field-group' }, h('label', { className: 'field-label' }, 'Numéro de cellule'),
+          h('input', { className: 'field-input', type: 'text', placeholder: 'Ex : B-214', value: state.form.cell, onInput: (e) => { state.form.cell = e.target.value; } })),
+        h('button', { className: 'btn btn-primary', style: { marginTop: '8px' }, onClick: isEdit ? updatePrisoner : addPrisoner }, isEdit ? 'Enregistrer les modifications' : 'Ajouter le détenu')
+      )
+    );
+  }
+  function renderVisitForm(isEdit) {
+    const p = getSelected();
+    return h('div', { className: 'view' },
+      h('div', { className: 'header' },
+        h('button', { className: 'back-btn', onClick: () => { resetForm(); state.editVisitId = null; setState({ view: 'detail' }); } }, '← Annuler'),
+        h('h1', null, isEdit ? 'Modifier la visite' : 'Nouvelle visite'),
+        p ? h('div', { className: 'header-sub' }, p.name) : null),
+      h('div', { className: 'body' },
+        h('div', { className: 'field-group' }, h('label', { className: 'field-label' }, 'Date de la visite'),
+          h('input', { className: 'field-input', type: 'date', value: state.form.date, onInput: (e) => { state.form.date = e.target.value; } })),
+        h('div', { className: 'field-group' }, h('label', { className: 'field-label' }, 'Notes'),
+          h('textarea', { className: 'field-textarea', placeholder: 'Observations, demandes, état de santé, suivi juridique…', value: state.form.notes, onInput: (e) => { state.form.notes = e.target.value; } })),
+        h('button', { className: 'btn btn-accent', style: { marginTop: '8px' }, onClick: isEdit ? updateVisit : addVisit }, isEdit ? 'Enregistrer les modifications' : 'Enregistrer la visite')
+      )
+    );
+  }
+  function renderImport() {
+    const fileInput = h('input', { type: 'file', accept: '.xlsx,.xls', style: { display: 'none' }, onChange: handleImport });
+    return h('div', { className: 'view' },
+      h('div', { className: 'header' }, h('button', { className: 'back-btn', onClick: () => setState({ view: 'list' }) }, '← Retour'), h('h1', null, 'Importer un fichier Excel')),
+      h('div', { className: 'body' },
+        h('div', { className: 'import-info', htmlContent:
+          '<strong>Format attendu</strong><br>Colonnes :<br><br>' +
+          '<span class="col-tag">Nom</span> <span class="col-tag">Cellule</span> <span class="col-tag">Date</span> <span class="col-tag">Notes</span> <span class="col-tag">Suivi</span><br><br>' +
+          'Chaque ligne = une visite. La colonne <em>Suivi</em> (optionnelle) permet d\'importer des suivis à faire. Les données existantes sont préservées.' }),
+        fileInput,
+        h('button', { className: 'btn btn-accent', onClick: () => fileInput.click() }, 'Sélectionner un fichier Excel')
+      )
+    );
+  }
+  function renderConfirmModal() {
+    const cd = state.confirmDelete;
+    const labels = { prisoner: 'la fiche de', visit: 'la visite du', suivi: 'le suivi' };
+    return h('div', { className: 'overlay', onClick: () => setState({ confirmDelete: null }) },
+      h('div', { className: 'modal', onClick: (e) => e.stopPropagation() },
+        h('p', { className: 'modal-title' }, 'Confirmer la suppression'),
+        h('p', { className: 'modal-text' }, 'Supprimer ' + (labels[cd.type] || '') + ' ', h('strong', null, cd.label), ' ?'),
+        h('div', { className: 'modal-btns' },
+          h('button', { className: 'btn btn-muted', onClick: () => setState({ confirmDelete: null }) }, 'Annuler'),
+          h('button', { className: 'btn btn-danger', onClick: () => {
+            if (cd.type === 'prisoner') deletePrisoner(cd.id);
+            else if (cd.type === 'visit') deleteVisit(cd.id);
+            else if (cd.type === 'suivi') deleteSuivi(cd.prisonerId, cd.id);
+          }}, 'Supprimer'))
+      )
+    );
+  }
+
+  render();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(e => console.log('SW:', e));
+  </script>
+</body>
+</html>
