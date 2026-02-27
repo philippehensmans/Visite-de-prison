@@ -495,7 +495,7 @@
           h('span', { className: 'selection-bar-text' }, state.selectedIds.length + ' sélectionné' + (state.selectedIds.length > 1 ? 's' : '')),
           h('button', { className: 'btn-sm btn-sm-card', onClick: () => selectAllFiltered(filtered.map(p => p.id)) },
             filtered.every(p => state.selectedIds.includes(p.id)) ? 'Tout désélectionner' : 'Tout sélectionner'),
-          h('button', { className: 'btn-sm btn-sm-danger', disabled: state.selectedIds.length === 0 ? 'true' : undefined, onClick: () => { if (state.selectedIds.length > 0) setState({ confirmDelete: { type: 'bulk', ids: [...state.selectedIds], label: state.selectedIds.length + ' fiche' + (state.selectedIds.length > 1 ? 's' : '') } }); } }, '🗑 Supprimer')
+          h('button', { className: 'btn-sm btn-sm-danger', style: state.selectedIds.length === 0 ? { opacity: '0.4', pointerEvents: 'none' } : {}, onClick: () => setState({ confirmDelete: { type: 'bulk', ids: [...state.selectedIds], label: state.selectedIds.length + ' fiche' + (state.selectedIds.length > 1 ? 's' : '') } }) }, '🗑 Supprimer')
         ) : null,
         ...filtered.map(p => {
           const pendingSv = p.suivis.filter(s => !s.done).length;
@@ -688,10 +688,7 @@
   }
   function renderConfirmModal() {
     const cd = state.confirmDelete;
-    const labels = { prisoner: 'la fiche de', visit: 'la visite du', suivi: 'le suivi', bulk: '' };
-    const modalText = cd.type === 'bulk'
-      ? 'Supprimer ' + cd.label + ' ?'
-      : 'Supprimer ' + (labels[cd.type] || '') + ' ';
+    const labels = { prisoner: 'la fiche de', visit: 'la visite du', suivi: 'le suivi' };
     return h('div', { className: 'overlay', onClick: () => setState({ confirmDelete: null }) },
       h('div', { className: 'modal', onClick: (e) => e.stopPropagation() },
         h('p', { className: 'modal-title' }, 'Confirmer la suppression'),
