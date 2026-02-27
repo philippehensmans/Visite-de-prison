@@ -178,6 +178,12 @@
     .card-visited-check { width: 22px; height: 22px; min-width: 22px; border-radius: 6px; border: 2px solid var(--border); background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; transition: all 0.15s; margin-top: 2px; }
     .card-visited-check:active { transform: scale(0.9); }
     .card-visited-check.checked { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .selection-bar { display: flex; align-items: center; gap: 10px; background: var(--danger-light); border: 1px solid var(--danger); border-radius: 12px; padding: 10px 16px; margin-bottom: 16px; }
+    .selection-bar-text { flex: 1; font-size: 14px; font-weight: 600; color: var(--danger); font-family: system-ui, -apple-system, sans-serif; }
+    .card-select-check { width: 22px; height: 22px; min-width: 22px; border-radius: 6px; border: 2px solid var(--danger); background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; transition: all 0.15s; margin-top: 2px; }
+    .card-select-check:active { transform: scale(0.9); }
+    .card-select-check.checked { background: var(--danger); border-color: var(--danger); color: #fff; }
+    .card.selected { border-color: var(--danger); background: var(--danger-light); }
   </style>
 </head>
 <body>
@@ -212,6 +218,7 @@
     view: 'list', tab: 'list',
     selectedId: null, editVisitId: null,
     search: '', suiviSearch: '', suiviFilter: 'pending', showArchived: false, visitedFilter: 'all',
+    selectionMode: false, selectedIds: [],
     sortField: 'name', sortDir: 'asc',
     form: { name: '', cell: '', date: todayStr(), notes: '', suiviText: '' },
     toast: null, confirmDelete: null,
@@ -297,6 +304,23 @@
     const p = state.prisoners.find(pr => pr.id === id); if (!p) return;
     p.visited = !p.visited;
     save(); render();
+  }
+  function toggleSelectPrisoner(id) {
+    const idx = state.selectedIds.indexOf(id);
+    if (idx === -1) state.selectedIds.push(id);
+    else state.selectedIds.splice(idx, 1);
+    render();
+  }
+  function selectAllFiltered(filteredIds) {
+    const allSelected = filteredIds.every(id => state.selectedIds.includes(id));
+    if (allSelected) state.selectedIds = state.selectedIds.filter(id => !filteredIds.includes(id));
+    else filteredIds.forEach(id => { if (!state.selectedIds.includes(id)) state.selectedIds.push(id); });
+    render();
+  }
+  function deleteSelectedPrisoners() {
+    const count = state.selectedIds.length;
+    state.prisoners = state.prisoners.filter(p => !state.selectedIds.includes(p.id));
+    save(); setState({ confirmDelete: null, selectionMode: false, selectedIds: [] }); showToast(count + ' fiche' + (count > 1 ? 's' : '') + ' supprimée' + (count > 1 ? 's' : ''));
   }
 
   // ─── Import / Export ──────────────────────────────────────────
@@ -442,6 +466,7 @@
           h('button', { className: 'btn-sm btn-sm-primary-light', onClick: () => { resetForm(); setState({ view: 'addPrisoner' }); } }, '+ Nouveau détenu'),
           h('button', { className: 'btn-sm btn-sm-accent-light', onClick: () => setState({ view: 'import' }) }, '↑ Importer'),
           activeCount > 0 ? h('button', { className: 'btn-sm btn-sm-card', onClick: handleExport }, '↓ Exporter') : null,
+          activeCount > 0 ? h('button', { className: 'btn-sm ' + (state.selectionMode ? 'btn-sm-danger' : 'btn-sm-card'), onClick: () => setState({ selectionMode: !state.selectionMode, selectedIds: [] }) }, state.selectionMode ? '✕ Annuler' : '☐ Sélectionner') : null,
           archivedCount > 0 ? h('button', { className: 'btn-sm btn-sm-archive', onClick: () => setState({ showArchived: true, search: '' }) }, '📦 Archives (' + archivedCount + ')') : null
         ) : null,
 
@@ -466,12 +491,21 @@
         filtered.length === 0 && activePrisoners.length === 0 && !showArchived ? h('div', { className: 'empty' }, h('div', { className: 'empty-icon' }, '📋'), h('p', { className: 'empty-title' }, 'Aucune fiche'), h('p', { className: 'empty-text' }, 'Ajoutez un détenu ou importez un fichier Excel.')) : null,
         filtered.length === 0 && activePrisoners.length === 0 && showArchived ? h('div', { className: 'empty' }, h('div', { className: 'empty-icon' }, '📦'), h('p', { className: 'empty-title' }, 'Aucune fiche archivée'), h('p', { className: 'empty-text' }, 'Les fiches archivées apparaîtront ici.')) : null,
         filtered.length === 0 && activePrisoners.length > 0 && (state.search || state.visitedFilter !== 'all') ? h('div', { className: 'empty' }, h('p', { className: 'empty-text' }, state.search ? 'Aucun résultat pour « ' + state.search + ' »' : 'Aucun résultat avec ce filtre.')) : null,
+        state.selectionMode && filtered.length > 0 ? h('div', { className: 'selection-bar' },
+          h('span', { className: 'selection-bar-text' }, state.selectedIds.length + ' sélectionné' + (state.selectedIds.length > 1 ? 's' : '')),
+          h('button', { className: 'btn-sm btn-sm-card', onClick: () => selectAllFiltered(filtered.map(p => p.id)) },
+            filtered.every(p => state.selectedIds.includes(p.id)) ? 'Tout désélectionner' : 'Tout sélectionner'),
+          h('button', { className: 'btn-sm btn-sm-danger', disabled: state.selectedIds.length === 0 ? 'true' : undefined, onClick: () => { if (state.selectedIds.length > 0) setState({ confirmDelete: { type: 'bulk', ids: [...state.selectedIds], label: state.selectedIds.length + ' fiche' + (state.selectedIds.length > 1 ? 's' : '') } }); } }, '🗑 Supprimer')
+        ) : null,
         ...filtered.map(p => {
           const pendingSv = p.suivis.filter(s => !s.done).length;
-          return h('div', { className: 'card' + (p.archived ? ' archived' : ''), onClick: () => setState({ selectedId: p.id, view: 'detail' }) },
+          const isSelected = state.selectedIds.includes(p.id);
+          return h('div', { className: 'card' + (p.archived ? ' archived' : '') + (state.selectionMode && isSelected ? ' selected' : ''), onClick: () => state.selectionMode ? toggleSelectPrisoner(p.id) : setState({ selectedId: p.id, view: 'detail' }) },
             h('div', { className: 'card-row' },
               h('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '10px', flex: '1', minWidth: '0' } },
-                h('button', { className: 'card-visited-check' + (p.visited ? ' checked' : ''), onClick: (e) => { e.stopPropagation(); toggleVisited(p.id); } }, p.visited ? '✓' : ''),
+                state.selectionMode
+                  ? h('button', { className: 'card-select-check' + (isSelected ? ' checked' : ''), onClick: (e) => { e.stopPropagation(); toggleSelectPrisoner(p.id); } }, isSelected ? '✓' : '')
+                  : h('button', { className: 'card-visited-check' + (p.visited ? ' checked' : ''), onClick: (e) => { e.stopPropagation(); toggleVisited(p.id); } }, p.visited ? '✓' : ''),
                 h('div', { style: { flex: '1', minWidth: '0' } }, h('p', { className: 'card-name' }, p.name), h('p', { className: 'card-meta' }, p.cell ? 'Cellule ' + p.cell : 'Cellule non renseignée'))
               ),
               h('div', { className: 'badges' },
@@ -654,17 +688,23 @@
   }
   function renderConfirmModal() {
     const cd = state.confirmDelete;
-    const labels = { prisoner: 'la fiche de', visit: 'la visite du', suivi: 'le suivi' };
+    const labels = { prisoner: 'la fiche de', visit: 'la visite du', suivi: 'le suivi', bulk: '' };
+    const modalText = cd.type === 'bulk'
+      ? 'Supprimer ' + cd.label + ' ?'
+      : 'Supprimer ' + (labels[cd.type] || '') + ' ';
     return h('div', { className: 'overlay', onClick: () => setState({ confirmDelete: null }) },
       h('div', { className: 'modal', onClick: (e) => e.stopPropagation() },
         h('p', { className: 'modal-title' }, 'Confirmer la suppression'),
-        h('p', { className: 'modal-text' }, 'Supprimer ' + (labels[cd.type] || '') + ' ', h('strong', null, cd.label), ' ?'),
+        cd.type === 'bulk'
+          ? h('p', { className: 'modal-text' }, 'Supprimer ', h('strong', null, cd.label), ' ? Cette action est irréversible.')
+          : h('p', { className: 'modal-text' }, 'Supprimer ' + (labels[cd.type] || '') + ' ', h('strong', null, cd.label), ' ?'),
         h('div', { className: 'modal-btns' },
           h('button', { className: 'btn btn-muted', onClick: () => setState({ confirmDelete: null }) }, 'Annuler'),
           h('button', { className: 'btn btn-danger', onClick: () => {
             if (cd.type === 'prisoner') deletePrisoner(cd.id);
             else if (cd.type === 'visit') deleteVisit(cd.id);
             else if (cd.type === 'suivi') deleteSuivi(cd.prisonerId, cd.id);
+            else if (cd.type === 'bulk') deleteSelectedPrisoners();
           }}, 'Supprimer'))
       )
     );
